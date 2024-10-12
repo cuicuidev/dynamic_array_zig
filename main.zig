@@ -5,7 +5,7 @@ pub fn main() !void {
     var allocator = gpa.allocator();
 
     const stdout = std.io.getStdOut().writer();
-    const arr_size: usize = 8;
+    const arr_size: usize = 32;
 
     var arr = try DynamicArray(usize).init(&allocator, 1);
     defer arr.deinit();
@@ -110,6 +110,7 @@ fn DynamicArray(comptime T: type) type {
 
             // We allocate the necessary memory first.
             var larger = try self.allocator.alloc(T, self.items.len * 2);
+            errdefer self.allocator.free(larger);
 
             // We copy our current array to the new memory.
             @memcpy(larger[0..self.items.len], self.items);
@@ -140,7 +141,7 @@ fn DynamicArray(comptime T: type) type {
             self.pos -= 1;
 
             // Finally we check if we can downsize.
-            if (self.pos == self.items.len / 2) {
+            if (self.pos < self.items.len / 3) {
                 try self.downsize();
             }
         }
@@ -151,6 +152,7 @@ fn DynamicArray(comptime T: type) type {
             if (self.items.len > 1) {
                 std.debug.print("Downsizing from {} to {}...\n", .{ self.items.len, self.items.len / 2 });
                 var smaller = try self.allocator.alloc(T, self.items.len / 2);
+                errdefer self.allocator.free(smaller);
 
                 @memcpy(smaller[0..self.pos], self.items[0..self.pos]);
 
@@ -180,6 +182,8 @@ fn DynamicArray(comptime T: type) type {
                 self.items[i] = undefined;
             }
             self.pos = 0;
+            self.free();
+            try self.allocator.alloc(T, 1);
         }
 
         // Frees all memory
